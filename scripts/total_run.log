@@ -1,0 +1,19 @@
+# 01. change directory
+echo changing directory to scripts
+cd ~/workbench/scripts
+
+# 02. make patient list
+echo making patient lists
+python3 /home/donghyun/workbench/scripts/00_list.py -i /home/donghyun/workbench/record_files/records500 -o /home/donghyun/workbench/results/output_files -s 100
+
+# 03. make plot
+echo making png files of each patients
+./home/donghyun/workbench/scripts/make_plot.log
+
+# 04. make annotation file of MI subclasses
+echo making MI subclasses annotation file
+python3 /home/donghyun/workbench/scripts/02_scp_annotation.py
+
+# 05. model train
+echo start model training
+python3 /home/donghyun/workbench/scripts/03_model.py
