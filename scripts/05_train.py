@@ -1,7 +1,7 @@
 import os
 
 import numpy as np
-from torchmetrics.classification import MultilabelAUROC
+from torcheval.metrics.aggregation.auc import AUC
 from torch.utils.data import DataLoader, random_split
 import torch
 from tqdm import tqdm
@@ -13,12 +13,11 @@ import torchvision
 import sys
 import timm
 import wandb
-import torch.nn.functional as F
 
 wandb.init(project='medical_ecg')
 wandb.config = {
   "learning_rate": 0.001,
-  "epochs": 150,
+  "epochs": 100,
   "batch_size": 64
 }
 img_path = '/home/dk58319/private/workbench/results/pngfiles'
@@ -28,7 +27,7 @@ args = {
         "LEARNING_RATE" : 0.001,
         "WEIGHT_DECAY" : 0.003,
         "BATCH_SIZE" : 64,
-        "NUM_EPOCHS" : 150,
+        "NUM_EPOCHS" : 100,
         "MEAN" : (0.485, 0.456, 0.406),
         "STD" : (0.229, 0.224, 0.225),
         "BETA" : 0,
@@ -65,14 +64,11 @@ optimizer = optim.AdamW(model.parameters(), lr=0.00001)
 criterion = nn.CrossEntropyLoss()
 scheduler = optim.lr_scheduler.OneCycleLR(optimizer, max_lr=0.001,total_steps=args["NUM_EPOCHS"],steps_per_epoch=len(train_loader), epochs=args["NUM_EPOCHS"])
 
-train_losses, validation_losses = [], []
-
-
 
 def validation(model, valid_loader, criterion):
-    auroc = MultilabelAUROC(num_labels=2, average="macro", thresholds=None)
     accuracy = 0
     valid_loss = 0
+    metric = AUC()
 
     for i, (X, y) in enumerate(valid_loader):
         if torch.cuda.is_available():
@@ -82,19 +78,18 @@ def validation(model, valid_loader, criterion):
 
         outputs = model(X)
         loss = criterion(outputs, y)
-        output = F.softmax(outputs, dim=1)
+        
         valid_loss += loss.item()
         outputs_ = torch.argmax(outputs, dim=1)
-        print(output)
-        print("-----------------------")
+        print(outputs_)
+        print("--------------------------")
         print(y)
-        
-        out_auroc= auroc(output,y)
+        metric.update(outputs_, y)
+        auc = metric.compute()
         accuracy += (outputs_ == y).float().sum()
-        print(accuracy)
     
 
-    return valid_loss, accuracy, out_auroc
+    return valid_loss, accuracy, auc
 
 
 def train_model(model, train_loader, valid_loader, criterion, optimizer, args, fold_num=1):
@@ -128,21 +123,19 @@ def train_model(model, train_loader, valid_loader, criterion, optimizer, args, f
             if steps % total_step == 0:
                 model.eval()
                 with torch.no_grad():
-                    valid_loss, accuracy, auroc = validation(model, valid_loader, criterion)
+                    valid_loss, accuracy, auc = validation(model, valid_loader, criterion)
 
                 print("Epoch: {}/{}.. ".format(epoch + 1, args['NUM_EPOCHS']) +
                       "Training Loss: {:.5f}.. ".format(running_loss / total_step) +
                       "Valid Loss: {:.5f}.. ".format(valid_loss / len(valid_loader)) +
                       "Valid Accuracy: {:.5f}.. ".format(accuracy / len(valid_loader.dataset)) )
-                wandb.log({"loss": (running_loss / total_step),"Valid loss":valid_loss / len(valid_loader) ,"Valid Accuracy": (accuracy / len(valid_loader.dataset)), "AUROC":auroc})
+                wandb.log({"loss": (running_loss / total_step),"Valid loss":valid_loss / len(valid_loader) ,"Valid Accuracy": (accuracy / len(valid_loader.dataset)), "AUC":auc})
                 # Save Model
                 if (valid_loss / len(valid_loader)) < best_val:
                     best_val = (valid_loss / len(valid_loader))
                     torch.save(model.state_dict(), f"{args['MODEL_PATH']}/"+f"{args['MODEL']}.pt")
                     print("------ model saved ------- : {:.5f}".format((accuracy/len(valid_loader.dataset))*100))
                 
-                train_losses.append(running_loss / len(train_loader))
-                validation_losses.append(valid_loss / len(valid_loader))
                 steps = 0
                 running_loss = 0
                 model.train()
@@ -152,7 +145,6 @@ def train_model(model, train_loader, valid_loader, criterion, optimizer, args, f
     return 
 
 
-with torch.no_grad():
-                    valid_loss, accuracy, auroc = validation(model, valid_loader, criterion)
-#train_model(model, train_loader, valid_loader, criterion, optimizer, args, fold_num=1)
+
+train_model(model, train_loader, valid_loader, criterion, optimizer, args, fold_num=1)
 

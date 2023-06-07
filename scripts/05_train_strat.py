@@ -1,7 +1,7 @@
 import os
 
 import numpy as np
-from torcheval.metrics import BinaryAUROC
+from torcheval.metrics.aggregation.auc import AUC
 from torch.utils.data import DataLoader, random_split
 import torch
 from tqdm import tqdm
@@ -21,7 +21,7 @@ from sklearn.model_selection import train_test_split,StratifiedShuffleSplit
 wandb.init(project='medical_ecg')
 wandb.config = {
   "learning_rate": 0.001,
-  "epochs": 150,
+  "epochs": 100,
   "batch_size": 64
 }
 img_path = '/home/dk58319/private/workbench/results/pngfiles'
@@ -77,35 +77,58 @@ model = timm.create_model(args["MODEL"], pretrained=True, num_classes=2).to(devi
 optimizer = optim.AdamW(model.parameters(), lr=0.0001)
 criterion = nn.CrossEntropyLoss()
 scheduler = optim.lr_scheduler.OneCycleLR(optimizer, max_lr=0.008,total_steps=args["NUM_EPOCHS"],steps_per_epoch=len(train_loader), epochs=args["NUM_EPOCHS"])
-metric = BinaryAUROC()
-
 
 train_losses, validation_losses = [], []
 
-def validation(model, test_loader, criterion):
 
+# def validation(model, test_loader, criterion):
+
+#     accuracy = 0
+#     valid_loss = 0
+#     auroc = 0
+    
+    
+#     for i, (X, y) in enumerate(test_loader):
+#         if torch.cuda.is_available():
+#             X = X.to(args["DEVICE"])
+#             y = y.type(torch.LongTensor)
+#             y = y.to(args["DEVICE"])
+        
+#         outputs = model(X)
+#         loss = criterion(outputs, y)
+#         auroc= auroc(outputs,y)
+#         #auroc = metric.compute()
+#         valid_loss += loss.item()
+#         outputs_ = torch.argmax(outputs, dim=1)
+        
+#         accuracy += (outputs_ == y).float().sum()
+    
+
+#     return valid_loss, accuracy, auroc
+
+def validation(model, test_loader, criterion):
     accuracy = 0
     valid_loss = 0
-    auroc = 0
-    
-    
+    metric = AUC()
+
     for i, (X, y) in enumerate(test_loader):
         if torch.cuda.is_available():
             X = X.to(args["DEVICE"])
             y = y.type(torch.LongTensor)
             y = y.to(args["DEVICE"])
-        
+
         outputs = model(X)
         loss = criterion(outputs, y)
-        #metric.update(X, y)
-        #auroc = metric.compute()
+        
         valid_loss += loss.item()
         outputs_ = torch.argmax(outputs, dim=1)
-        
+        print(outputs_)
+        print("--------------------------")
+        print(y)
+        metric.update(outputs_, y)
+        auc = metric.compute()
         accuracy += (outputs_ == y).float().sum()
     
-
-    return valid_loss, accuracy
 
 
 def train_model(model, train_loader, test_loader, criterion, optimizer, args, fold_num=1):
@@ -135,22 +158,37 @@ def train_model(model, train_loader, test_loader, criterion, optimizer, args, fo
             optimizer.step()
 
             running_loss += loss.item()
-            
             if steps % total_step == 0:
                 model.eval()
                 with torch.no_grad():
-                    valid_loss, accuracy= validation(model, test_loader, criterion)
+                    valid_loss, accuracy, auc = validation(model, test_loader, criterion)
 
                 print("Epoch: {}/{}.. ".format(epoch + 1, args['NUM_EPOCHS']) +
                       "Training Loss: {:.5f}.. ".format(running_loss / total_step) +
                       "Valid Loss: {:.5f}.. ".format(valid_loss / len(test_loader)) +
-                      "Valid Accuracy: {:.5f}.. ".format(accuracy / len(test_loader.dataset)) )
-                wandb.log({"loss": (running_loss / total_step),"Valid loss":valid_loss / len(test_loader) ,"Valid Accuracy": (accuracy / len(test_loader.dataset))})
+                      "Valid Accuracy: {:.5f}.. ".format(accuracy / (len(test_loader.dataset)*0.2)) )
+                wandb.log({"loss": (running_loss / total_step),"Valid loss":(valid_loss / len(test_loader)) ,"Valid Accuracy": (accuracy / (len(test_loader.dataset)*0.2)), "AUC":auc})
                 # Save Model
                 if (valid_loss / len(test_loader)) < best_val:
                     best_val = (valid_loss / len(test_loader))
                     torch.save(model.state_dict(), f"{args['MODEL_PATH']}/"+f"{args['MODEL']}.pt")
-                    print("------ model saved ------- : {:.5f}".format((accuracy/len(test_loader.dataset))*100))
+                    print("------ model saved ------- : {:.5f}".format((accuracy/(len(test_loader.dataset)*0.2))*100))
+            
+            # if steps % total_step == 0:
+            #     model.eval()
+            #     with torch.no_grad():
+            #         valid_loss, accuracy= validation(model, test_loader, criterion)
+
+            #     print("Epoch: {}/{}.. ".format(epoch + 1, args['NUM_EPOCHS']) +
+            #           "Training Loss: {:.5f}.. ".format(running_loss / total_step) +
+            #           "Valid Loss: {:.5f}.. ".format(valid_loss / len(test_loader)) +
+            #           "Valid Accuracy: {:.5f}.. ".format(accuracy / len(test_loader.dataset)) )
+            #     wandb.log({"loss": (running_loss / total_step),"Valid loss":valid_loss / len(test_loader) ,"Valid Accuracy": (accuracy / len(test_loader.dataset))})
+            #     # Save Model
+            #     if (valid_loss / len(test_loader)) < best_val:
+            #         best_val = (valid_loss / len(test_loader))
+            #         torch.save(model.state_dict(), f"{args['MODEL_PATH']}/"+f"{args['MODEL']}.pt")
+            #         print("------ model saved ------- : {:.5f}".format((accuracy/len(test_loader.dataset))*100))
                 
                 train_losses.append(running_loss / len(train_loader))
                 validation_losses.append(valid_loss / len(test_loader))
@@ -161,6 +199,7 @@ def train_model(model, train_loader, test_loader, criterion, optimizer, args, fo
         scheduler.step()
 
     return 
+
 
 train_model(model, train_loader, test_loader, criterion, optimizer, args, fold_num=1)
 
