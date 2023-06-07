@@ -13,6 +13,7 @@ import torchvision
 import sys
 import timm
 import wandb
+import torch.nn.functional as F
 
 wandb.init(project='medical_ecg')
 wandb.config = {
@@ -81,14 +82,19 @@ def validation(model, valid_loader, criterion):
 
         outputs = model(X)
         loss = criterion(outputs, y)
-        out_auroc= auroc(outputs,y)
+        output = F.softmax(outputs, dim=1)
         valid_loss += loss.item()
         outputs_ = torch.argmax(outputs, dim=1)
+        print(output)
+        print("-----------------------")
+        print(y)
         
+        out_auroc= auroc(output,y)
         accuracy += (outputs_ == y).float().sum()
+        print(accuracy)
     
 
-    return valid_loss, accuracy, auroc
+    return valid_loss, accuracy, out_auroc
 
 
 def train_model(model, train_loader, valid_loader, criterion, optimizer, args, fold_num=1):
@@ -145,5 +151,8 @@ def train_model(model, train_loader, valid_loader, criterion, optimizer, args, f
 
     return 
 
-train_model(model, train_loader, valid_loader, criterion, optimizer, args, fold_num=1)
+
+with torch.no_grad():
+                    valid_loss, accuracy, auroc = validation(model, valid_loader, criterion)
+#train_model(model, train_loader, valid_loader, criterion, optimizer, args, fold_num=1)
 
