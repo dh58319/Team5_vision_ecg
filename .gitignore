@@ -1,3 +1,5 @@
 results/pngfiles/
 git/
 record_files/
+model/
+scripts/wandb/
