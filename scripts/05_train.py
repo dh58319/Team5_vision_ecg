@@ -32,6 +32,7 @@ args = {
         "STD" : (0.229, 0.224, 0.225),
         "BETA" : 0,
         "MODEL" : 'vit_tiny_patch16_384.augreg_in21k_ft_in1k',
+        "MODEL_CNN" : 'resnet152.tv2_in1k',  
         "MODEL_PATH" : "../model",
         "NUM_FOLDS" : 1,
         "DEVICE" : torch.device("cuda:0" if torch.cuda.is_available() else 'cpu')}
@@ -42,8 +43,16 @@ transform = transforms.Compose(
         transforms.ToTensor(),
     ]
 )
+transform_cnn = transforms.Compose(
+    [
+        transforms.RandomCrop(176),
+        transforms.RandomHorizontalFlip(p = 0.3),
+        transforms.RandomRotation(15),
+        transforms.ToTensor(),
+    ]
+)
 
-dataset = ECG_dataset(csv_path, img_path, transform=transform)
+dataset = ECG_dataset(csv_path, img_path, transform=transform_cnn)
 dataset_len = len(dataset)
 print(dataset_len)
 train_size = int(17440)
@@ -57,19 +66,20 @@ valid_loader = DataLoader(
     validation_dataset, batch_size=64, shuffle=True, num_workers=8)
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
-model = timm.create_model(args["MODEL"], pretrained=True, num_classes=2).to(device)
+model = timm.create_model(args["MODEL_CNN"], pretrained=True, num_classes=2).to(device)
 
+print(model)
 
 optimizer = optim.AdamW(model.parameters(), lr=0.00001)
 criterion = nn.CrossEntropyLoss()
-scheduler = optim.lr_scheduler.OneCycleLR(optimizer, max_lr=0.001,total_steps=args["NUM_EPOCHS"],steps_per_epoch=len(train_loader), epochs=args["NUM_EPOCHS"])
+scheduler = optim.lr_scheduler.OneCycleLR(optimizer, max_lr=0.0004,total_steps=args["NUM_EPOCHS"],steps_per_epoch=len(train_loader), epochs=args["NUM_EPOCHS"])
 
 
 def validation(model, valid_loader, criterion):
     accuracy = 0
     valid_loss = 0
+    model.eval()
     metric = AUC()
-
     for i, (X, y) in enumerate(valid_loader):
         if torch.cuda.is_available():
             X = X.to(args["DEVICE"])
@@ -81,15 +91,13 @@ def validation(model, valid_loader, criterion):
         
         valid_loss += loss.item()
         outputs_ = torch.argmax(outputs, dim=1)
-        print(outputs_)
-        print("--------------------------")
-        print(y)
         metric.update(outputs_, y)
-        auc = metric.compute()
+        auc_ = metric.compute()
+        metric.reset()
         accuracy += (outputs_ == y).float().sum()
     
 
-    return valid_loss, accuracy, auc
+    return valid_loss, accuracy, auc_
 
 
 def train_model(model, train_loader, valid_loader, criterion, optimizer, args, fold_num=1):
@@ -104,7 +112,7 @@ def train_model(model, train_loader, valid_loader, criterion, optimizer, args, f
     for epoch in range(args['NUM_EPOCHS']):
         running_loss = 0
         for i, (X, y) in tqdm(enumerate(train_loader)):
-            
+            model.train()
             if torch.cuda.is_available():
                 X = X.to(args["DEVICE"])
                 y = y.type(torch.LongTensor)
@@ -121,7 +129,6 @@ def train_model(model, train_loader, valid_loader, criterion, optimizer, args, f
             running_loss += loss.item()
             
             if steps % total_step == 0:
-                model.eval()
                 with torch.no_grad():
                     valid_loss, accuracy, auc = validation(model, valid_loader, criterion)
 
@@ -145,6 +152,4 @@ def train_model(model, train_loader, valid_loader, criterion, optimizer, args, f
     return 
 
 
-
 train_model(model, train_loader, valid_loader, criterion, optimizer, args, fold_num=1)
-
