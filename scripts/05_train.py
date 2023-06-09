@@ -1,7 +1,7 @@
 import os
 
 import numpy as np
-from torcheval.metrics.aggregation.auc import AUC
+from torcheval.metrics.functional import binary_auprc
 from torch.utils.data import DataLoader, random_split
 import torch
 from tqdm import tqdm
@@ -24,9 +24,6 @@ img_path = '/home/dk58319/private/workbench/results/pngfiles'
 csv_path = '/home/dk58319/private/workbench/results/output_files/MI_annotation.csv'
 
 args = {
-        "LEARNING_RATE" : 0.001,
-        "WEIGHT_DECAY" : 0.003,
-        "BATCH_SIZE" : 64,
         "NUM_EPOCHS" : 100,
         "MEAN" : (0.485, 0.456, 0.406),
         "STD" : (0.229, 0.224, 0.225),
@@ -43,27 +40,26 @@ transform = transforms.Compose(
         transforms.ToTensor(),
     ]
 )
-transform_cnn = transforms.Compose(
+transform_vit = transforms.Compose(
     [
         transforms.RandomCrop(384),
-        transforms.RandomHorizontalFlip(p = 0.3),
-        transforms.RandomRotation(15),
+        #transforms.RandomHorizontalFlip(p = 0.3),
+        #transforms.RandomRotation(15),
         transforms.ToTensor(),
     ]
 )
 
-dataset = ECG_dataset(csv_path, img_path, transform=transform_cnn)
+dataset = ECG_dataset(csv_path, img_path, transform=transform_vit)
 dataset_len = len(dataset)
 print(dataset_len)
 train_size = int(17440)
 val_size = int(dataset_len - 17440)
 
 train_dataset, validation_dataset = random_split(
-    dataset, [train_size, val_size])
+    dataset, [train_size, val_size], generator=torch.Generator().manual_seed(42))
 
 train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True, num_workers=8)
-valid_loader = DataLoader(
-    validation_dataset, batch_size=64, shuffle=True, num_workers=8)
+valid_loader = DataLoader(validation_dataset, batch_size=64, shuffle=True, num_workers=8)
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 model = timm.create_model(args["MODEL"], pretrained=True, num_classes=2).to(device)
@@ -72,14 +68,14 @@ print(model)
 
 optimizer = optim.AdamW(model.parameters(), lr=0.0001)
 criterion = nn.CrossEntropyLoss()
-#scheduler = optim.lr_scheduler.OneCycleLR(optimizer, max_lr=0.0004,total_steps=args["NUM_EPOCHS"],steps_per_epoch=len(train_loader), epochs=args["NUM_EPOCHS"])
+scheduler = optim.lr_scheduler.OneCycleLR(optimizer, max_lr=0.0004,total_steps=args["NUM_EPOCHS"],steps_per_epoch=len(train_loader), epochs=args["NUM_EPOCHS"])
 
 
 def validation(model, valid_loader, criterion):
     accuracy = 0
     valid_loss = 0
     model.eval()
-    metric = AUC()
+    auprc= []
     for i, (X, y) in enumerate(valid_loader):
         if torch.cuda.is_available():
             X = X.to(args["DEVICE"])
@@ -87,19 +83,19 @@ def validation(model, valid_loader, criterion):
             y = y.to(args["DEVICE"])
 
         outputs = model(X)
+
         loss = criterion(outputs, y)
-        
         valid_loss += loss.item()
         outputs_ = torch.argmax(outputs, dim=1)
-        metric.update(outputs_, y)
+        a= binary_auprc(outputs_, y)
+        print(a)
+        auprc.append(a)
+        accuracy += (outputs_ == y).float().sum() 
         
-        accuracy += (outputs_ == y).float().sum()
-        
-    auc_ = metric.compute()
-    metric.reset()
+    auc_ = sum(auprc)/len(auprc)
     
-
     return valid_loss, accuracy, auc_
+
 
 
 def train_model(model, train_loader, valid_loader, criterion, optimizer, args, fold_num=1):
@@ -149,7 +145,7 @@ def train_model(model, train_loader, valid_loader, criterion, optimizer, args, f
                 running_loss = 0
                 model.train()
                 
-        #scheduler.step()
+        scheduler.step()
 
     return 
 
