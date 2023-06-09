@@ -31,7 +31,7 @@ args = {
         "MEAN" : (0.485, 0.456, 0.406),
         "STD" : (0.229, 0.224, 0.225),
         "BETA" : 0,
-        "MODEL" : 'vit_tiny_patch16_384.augreg_in21k_ft_in1k',
+        "MODEL" : 'vit_tiny_patch16_384.augreg_in21k_ft_in1k', #384
         "MODEL_CNN" : 'resnet152.tv2_in1k',  
         "MODEL_PATH" : "../model",
         "NUM_FOLDS" : 1,
@@ -45,7 +45,7 @@ transform = transforms.Compose(
 )
 transform_cnn = transforms.Compose(
     [
-        transforms.RandomCrop(176),
+        transforms.RandomCrop(384),
         transforms.RandomHorizontalFlip(p = 0.3),
         transforms.RandomRotation(15),
         transforms.ToTensor(),
@@ -66,13 +66,13 @@ valid_loader = DataLoader(
     validation_dataset, batch_size=64, shuffle=True, num_workers=8)
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
-model = timm.create_model(args["MODEL_CNN"], pretrained=True, num_classes=2).to(device)
+model = timm.create_model(args["MODEL"], pretrained=True, num_classes=2).to(device)
 
 print(model)
 
-optimizer = optim.AdamW(model.parameters(), lr=0.00001)
+optimizer = optim.AdamW(model.parameters(), lr=0.0001)
 criterion = nn.CrossEntropyLoss()
-scheduler = optim.lr_scheduler.OneCycleLR(optimizer, max_lr=0.0004,total_steps=args["NUM_EPOCHS"],steps_per_epoch=len(train_loader), epochs=args["NUM_EPOCHS"])
+#scheduler = optim.lr_scheduler.OneCycleLR(optimizer, max_lr=0.0004,total_steps=args["NUM_EPOCHS"],steps_per_epoch=len(train_loader), epochs=args["NUM_EPOCHS"])
 
 
 def validation(model, valid_loader, criterion):
@@ -92,9 +92,11 @@ def validation(model, valid_loader, criterion):
         valid_loss += loss.item()
         outputs_ = torch.argmax(outputs, dim=1)
         metric.update(outputs_, y)
-        auc_ = metric.compute()
-        metric.reset()
+        
         accuracy += (outputs_ == y).float().sum()
+        
+    auc_ = metric.compute()
+    metric.reset()
     
 
     return valid_loss, accuracy, auc_
@@ -147,7 +149,7 @@ def train_model(model, train_loader, valid_loader, criterion, optimizer, args, f
                 running_loss = 0
                 model.train()
                 
-        scheduler.step()
+        #scheduler.step()
 
     return 
 
