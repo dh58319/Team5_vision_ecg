@@ -1,0 +1,50 @@
+Script started on 2023-06-11 04:47:54+0000
+]0;dk58319@dk58319: ~/private/workbench[01;32mdk58319@dk58319[00m:[01;34m~/private/workbench[00m$ cd scripts/
+]0;dk58319@dk58319: ~/private/workbench/scripts[01;32mdk58319@dk58319[00m:[01;34m~/private/workbench/scripts[00m$ cd scripts/tmux attach -t 1[8Pgit pushcommit -m "ADD: AUPRC to train code"[3P"ADD: AUPRC to train code"add .[Kls[Kcd workbench/[2Pprivate/[2@workbench/ls[Kgit add .commit "ADD: AUPRC to train code"[3@-m "ADD: AUPRC to train code"push[Ktmux attach -t 1[5Pcd scripts/[Kscript --help
+
+Usage:
+ script [options] [file]
+
+Make a typescript of a terminal session.
+
+Options:
+ -a, --append                  append the output
+ -c, --command <command>       run command rather than interactive shell
+ -e, --return                  return exit code of the child process
+ -f, --flush                   run flush after each write
+     --force                   use output file even when it is a link
+ -q, --quiet                   be quiet
+ -t[<file>], --timing[=<file>] output timing data to stderr or to FILE
+ -h, --help                    display this help
+ -V, --version                 display version
+
+For more details see script(1).
+]0;dk58319@dk58319: ~/private/workbench/scripts[01;32mdk58319@dk58319[00m:[01;34m~/private/workbench/scripts[00m$ script --help[2Pcd scripts/tmux attach -t 1[8Pgit pushcommit -m "ADD: AUPRC to train code"[3P"ADD: AUPRC to train code"add .[Kls[Kcd workbench/[2Pprivate/tmux attach -t 1CUDA_DEVICE_ORDER=PCI_BUS_ID CUDA_VISIBLE_DEVICES=5 python 06_validation.py cd scripts/[KCUDA_DEVICE_ORDER=PCI_BUS_ID CUDA_VISIBLE_DEVICES=5 python 06_validation.py 
+21799
+Traceback (most recent call last):
+  File "06_validation.py", line 81, in <module>
+    loss, accuracy, auc = validation(model, valid_loader, criterion)
+  File "06_validation.py", line 67, in validation
+    outputs = model(X)
+  File "/opt/conda/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1110, in _call_impl
+    return forward_call(*input, **kwargs)
+  File "/home/dk58319/.local/lib/python3.8/site-packages/timm/models/vision_transformer.py", line 632, in forward
+    x = self.forward_features(x)
+  File "/home/dk58319/.local/lib/python3.8/site-packages/timm/models/vision_transformer.py", line 620, in forward_features
+    x = self.blocks(x)
+  File "/opt/conda/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1110, in _call_impl
+    return forward_call(*input, **kwargs)
+  File "/opt/conda/lib/python3.8/site-packages/torch/nn/modules/container.py", line 141, in forward
+    input = module(input)
+  File "/opt/conda/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1110, in _call_impl
+    return forward_call(*input, **kwargs)
+  File "/home/dk58319/.local/lib/python3.8/site-packages/timm/models/vision_transformer.py", line 155, in forward
+    x = x + self.drop_path1(self.ls1(self.attn(self.norm1(x))))
+  File "/opt/conda/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1110, in _call_impl
+    return forward_call(*input, **kwargs)
+  File "/home/dk58319/.local/lib/python3.8/site-packages/timm/models/vision_transformer.py", line 81, in forward
+    qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, self.head_dim).permute(2, 0, 3, 1, 4)
+  File "/opt/conda/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1110, in _call_impl
+    return forward_call(*input, **kwargs)
+  File "/opt/conda/lib/python3.8/site-packages/torch/nn/modules/linear.py", line 103, in forward
+    return F.linear(input, self.weigh

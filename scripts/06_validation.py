@@ -31,23 +31,7 @@ transform = transforms.Compose(
         transforms.ToTensor(),
     ]
 )
-transform_cnn = transforms.Compose(
-    [
-        transforms.RandomCrop(176),
-        transforms.RandomHorizontalFlip(p = 0.3),
-        transforms.RandomRotation(15),
-        transforms.ToTensor(),
-    ]
-)
 
-transform_vit = transforms.Compose(
-    [
-        transforms.RandomCrop(384),
-        transforms.RandomHorizontalFlip(p = 0.3),
-        transforms.RandomRotation(15),
-        transforms.ToTensor(),
-    ]
-)
 
 
 dataset = ECG_dataset(csv_path, img_path, transform=transform)
@@ -83,7 +67,6 @@ def validation(model, valid_loader, criterion):
         outputs = model(X)
 
         loss = criterion(outputs, y)
-        #auc_ = metric(outputs, y)
         valid_loss += loss.item()
         outputs_ = torch.argmax(outputs, dim=1)
         a= binary_auprc(outputs_, y)
