@@ -17,3 +17,7 @@ python3 /home/donghyun/workbench/scripts/02_scp_annotation.py
 # 05. model train
 echo start model training
 python3 /home/donghyun/workbench/scripts/05_train.py
+
+# 06. model test
+echo start model test
+python3 /home/donghyun/workbench/scripts/06_validation.py
