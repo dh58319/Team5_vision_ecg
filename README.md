@@ -7,36 +7,15 @@ Final project of Team 5.
 
 ## Installation
 
-Use the package manager [pip](https://pip.pypa.io/en/stable/) to install vit-torch.
-
+Use pip to install timm(pytorch vision model) library
 ```bash
-git clone https://github.com/lucidrains/vit-pytorch
+pip install timm
 ```
-
-## Dataset
-TODO
-
 
 ## Usage
 
-```python
-v = ViT(
-    image_size = 256,
-    patch_size = 32,
-    num_classes = 1000,
-    dim = 1024,
-    depth = 6,
-    heads = 16,
-    mlp_dim = 2048,
-    dropout = 0.1,
-    emb_dropout = 0.1
-)
+please check total_run.log
 
-img = torch.randn(1, 3, 256, 256)
 
-preds = v(img) # (1, 1000)
-```
 
-## License
 
-[vit-torch](https://github.com/lucidrains/vit-pytorch)
