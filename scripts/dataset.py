@@ -32,7 +32,7 @@ class ECG_dataset(Dataset):
         image = Image.open(os.path.join(self.path, str(
             self.image_names[index]).zfill(5)+'.png'))
         image = image.convert('RGB')
-        image = image.resize((400, 400))
+        image = image.resize((1000, 1000))
         if self.transform is not None:
             image = self.transform(image)
         label = self.df.iloc[index]['non']

@@ -29,15 +29,15 @@ args = {
         "STD" : (0.229, 0.224, 0.225),
         "BETA" : 0,
         "MODEL" : 'vit_tiny_patch16_384.augreg_in21k_ft_in1k', #384
-        "MODEL_DEIT" : 'deit3_base_patch16_384.fb_in1k',
+        "MODEL_DEIT" : 'deit3_small_patch16_384.fb_in1k',
         "MODEL_CNN" : 'resnet152.tv2_in1k',  
         "MODEL_PATH" : "../model",
         "NUM_FOLDS" : 1,
         "DEVICE" : torch.device("cuda:0" if torch.cuda.is_available() else 'cpu')}
 
-transform = transforms.Compose(
+transform_valid = transforms.Compose(
     [
-        transforms.RandomRotation(15),
+        transforms.Resize(384),
         transforms.ToTensor(),
     ]
 )
@@ -51,19 +51,24 @@ transform_vit = transforms.Compose(
 )
 
 dataset = ECG_dataset(csv_path, img_path, transform=transform_vit)
+dataset_valid = ECG_dataset(csv_path, img_path, transform=transform_valid)
 dataset_len = len(dataset)
 print(dataset_len)
 train_size = int(17440)
 val_size = int(dataset_len - 17440)
 
-train_dataset, validation_dataset = random_split(
-    dataset, [train_size, val_size], generator=torch.Generator().manual_seed(42))
+train_dataset, _ = random_split(
+    dataset, [train_size, val_size], generator=torch.Generator().manual_seed(42))##for train section
+
+__, test_dataset = random_split(
+    dataset_valid, [train_size, val_size], generator=torch.Generator().manual_seed(42))
+
 
 train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True, num_workers=8)
-valid_loader = DataLoader(validation_dataset, batch_size=64, shuffle=True, num_workers=8)
+valid_loader = DataLoader(test_dataset, batch_size=64, shuffle=True, num_workers=8)
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
-model = timm.create_model(args["MODEL_DEIT"], pretrained=True, num_classes=2).to(device)
+model = timm.create_model(args["MODEL"], pretrained=True, num_classes=2).to(device)
 
 print(model)
 
@@ -133,12 +138,13 @@ def train_model(model, train_loader, valid_loader, criterion, optimizer, args, f
                 print("Epoch: {}/{}.. ".format(epoch + 1, args['NUM_EPOCHS']) +
                       "Training Loss: {:.5f}.. ".format(running_loss / total_step) +
                       "Valid Loss: {:.5f}.. ".format(valid_loss / len(valid_loader)) +
-                      "Valid Accuracy: {:.5f}.. ".format(accuracy / len(valid_loader.dataset)) )
+                      "Valid Accuracy: {:.5f}.. ".format(accuracy / len(valid_loader.dataset)) +
+                      "auc: {:.5f}..".format(auc))
                 wandb.log({"loss": (running_loss / total_step),"Valid loss":valid_loss / len(valid_loader) ,"Valid Accuracy": (accuracy / len(valid_loader.dataset)), "AUC":auc})
                 # Save Model
                 if (valid_loss / len(valid_loader)) < best_val:
                     best_val = (valid_loss / len(valid_loader))
-                    torch.save(model.state_dict(), f"{args['MODEL_PATH']}/"+f"{args['MODEL_DEIT']}.pt")
+                    torch.save(model.state_dict(), f"{args['MODEL_PATH']}/"+f"{args['MODEL']}.pt")
                     print("------ model saved ------- : {:.5f}".format((accuracy/len(valid_loader.dataset))*100))
                 
                 steps = 0

@@ -32,8 +32,6 @@ transform = transforms.Compose(
     ]
 )
 
-
-
 dataset = ECG_dataset(csv_path, img_path, transform=transform)
 dataset_len = len(dataset)
 print(dataset_len)
@@ -41,14 +39,14 @@ train_size = int(17440)
 val_size = int(dataset_len - 17440)
 
 train_dataset, validation_dataset = random_split(
-    dataset, [train_size, val_size], generator=torch.Generator().manual_seed(42))
+    dataset, [train_size, val_size])
 
 train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True, num_workers=8)
 valid_loader = DataLoader(validation_dataset, batch_size=64, shuffle=True, num_workers=8)
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
-model = timm.create_model(args["MODEL"], pretrained=True, num_classes=2).to(device) # 모델 명은 args에 정의되어있습니다. []안을 수정하시면 다른 모델을 가지고 올 수 있습니다.
-model.load_state_dict(torch.load('../model/vit_tiny_patch16_384.augreg_in21k_ft_in1k_871.pt')) ## 여기에 모델 파라미터 path를 넣으시면 됩니다.
+model = timm.create_model(args["MODEL"], pretrained=False, num_classes=2).to(device) # 모델 명은 args에 정의되어있습니다. []안을 수정하시면 다른 모델을 가지고 올 수 있습니다.
+model.load_state_dict(torch.load('../model/vit_tiny_patch16_384.augreg_in21k_ft_in1k_crop_flip.pt')) ## 여기에 모델 파라미터 path를 넣으시면 됩니다.
 
 criterion = nn.CrossEntropyLoss()
 
@@ -70,7 +68,7 @@ def validation(model, valid_loader, criterion):
         valid_loss += loss.item()
         outputs_ = torch.argmax(outputs, dim=1)
         a= binary_auprc(outputs_, y)
-        print(a)
+        #print(a)
         auprc.append(a)
         accuracy += (outputs_ == y).float().sum() 
         
