@@ -29,6 +29,7 @@ args = {
         "STD" : (0.229, 0.224, 0.225),
         "BETA" : 0,
         "MODEL" : 'vit_tiny_patch16_384.augreg_in21k_ft_in1k', #384
+        "MODEL_DEIT" : 'deit3_base_patch16_384.fb_in1k',
         "MODEL_CNN" : 'resnet152.tv2_in1k',  
         "MODEL_PATH" : "../model",
         "NUM_FOLDS" : 1,
@@ -43,8 +44,8 @@ transform = transforms.Compose(
 transform_vit = transforms.Compose(
     [
         transforms.RandomCrop(384),
-        #transforms.RandomHorizontalFlip(p = 0.3),
-        #transforms.RandomRotation(15),
+        transforms.RandomHorizontalFlip(p = 0.3),
+        transforms.RandomRotation(15),
         transforms.ToTensor(),
     ]
 )
@@ -62,11 +63,11 @@ train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True, num_worker
 valid_loader = DataLoader(validation_dataset, batch_size=64, shuffle=True, num_workers=8)
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
-model = timm.create_model(args["MODEL"], pretrained=True, num_classes=2).to(device)
+model = timm.create_model(args["MODEL_DEIT"], pretrained=True, num_classes=2).to(device)
 
 print(model)
 
-optimizer = optim.AdamW(model.parameters(), lr=0.0001)
+optimizer = optim.AdamW(model.parameters(), lr=0.00001)
 criterion = nn.CrossEntropyLoss()
 scheduler = optim.lr_scheduler.OneCycleLR(optimizer, max_lr=0.0004,total_steps=args["NUM_EPOCHS"],steps_per_epoch=len(train_loader), epochs=args["NUM_EPOCHS"])
 
@@ -88,7 +89,6 @@ def validation(model, valid_loader, criterion):
         valid_loss += loss.item()
         outputs_ = torch.argmax(outputs, dim=1)
         a= binary_auprc(outputs_, y)
-        print(a)
         auprc.append(a)
         accuracy += (outputs_ == y).float().sum() 
         
@@ -138,7 +138,7 @@ def train_model(model, train_loader, valid_loader, criterion, optimizer, args, f
                 # Save Model
                 if (valid_loss / len(valid_loader)) < best_val:
                     best_val = (valid_loss / len(valid_loader))
-                    torch.save(model.state_dict(), f"{args['MODEL_PATH']}/"+f"{args['MODEL']}.pt")
+                    torch.save(model.state_dict(), f"{args['MODEL_PATH']}/"+f"{args['MODEL_DEIT']}.pt")
                     print("------ model saved ------- : {:.5f}".format((accuracy/len(valid_loader.dataset))*100))
                 
                 steps = 0
